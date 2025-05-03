@@ -48,6 +48,7 @@ services:
       - loki
     networks:
       - observability
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
     command: ["--config=/etc/otel/otel-collector-config.yaml"]
@@ -65,6 +66,74 @@ services:
 #      - ./terraform:/terraform
 #    working_dir: /terraform
 #    entrypoint: [ "/bin/sh", "-c", "while true; do sleep 1000; done" ]
+  node_exporter:
+    image: prom/node-exporter:latest
+    container_name: node_exporter
+    privileged: true
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+      - ./textfile-collector:/var/lib/node_exporter/textfile_collector
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--collector.textfile.directory=/var/lib/node_exporter/textfile_collector'
+    networks:
+      - observability
+
+  sensor_collector:
+    image: alpine:latest
+    container_name: sensor_collector
+    volumes:
+      - ./textfile-collector:/var/lib/node_exporter/textfile_collector
+      - /sys/class/hwmon:/sys/class/hwmon:ro
+      - /etc/sensors3.conf:/etc/sensors3.conf:ro
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache lm_sensors
+        while true; do
+          {
+            echo "# HELP node_thermal_zone_temp CPU core & package temperature in °C"
+            echo "# TYPE node_thermal_zone_temp gauge"
+            sensors -u | awk '
+              /^[^[:space:]]/ { device=$0 }
+              /^[[:space:]]+temp[0-9]+_input:/ {
+                if (device ~ /^Core [0-9]+:$/ || device == "Package id 0:") {
+                  gsub(/:/, "", $1)
+                  printf "node_thermal_zone_temp{sensor=\"%s\"} %s\n", device, $2
+                }
+              }
+            '
+          } > /var/lib/node_exporter/textfile_collector/thermal.prom
+
+          sleep 15
+        done
+  
+  
+  
+
+  dcgm_exporter:
+    image: nvidia/dcgm-exporter:latest
+    container_name: dcgm_exporter
+    runtime: nvidia
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities: [ gpu ]
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+    ports:
+      - "9400:9400"
+    networks:
+      - observability
 
 volumes:
   grafana_data:
