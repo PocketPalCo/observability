@@ -58,6 +58,7 @@ services:
       - "8889:8889"    # Prometheus metrics endpoint
     networks:
       - observability
+      - shopping-network
 
   node_exporter:
     image: prom/node-exporter:latest
@@ -114,3 +115,6 @@ volumes:
 networks:
   observability:
     driver: bridge
+  shopping-network:
+    name: shopping-network
+    external: true
