@@ -17,14 +17,11 @@ processors:
         value: pocket-pal
         action: insert
 
-  # Transform logs to Loki format
+  # Convert OTLP logs to Loki format
   attributes:
     actions:
-      - key: loki.tenant
-        value: pocket-pal
-        action: insert
-      - key: loki.attribute.labels
-        value: service.name,service.version,service.namespace
+      - key: loki.format
+        value: json
         action: insert
 
 exporters:
@@ -36,20 +33,17 @@ exporters:
     tls:
       insecure: true
 
-  # Direct Loki exporter (the original working approach)
-  loki:
+  # Use generic HTTP exporter for Loki with proper format
+  otlphttp:
     endpoint: "http://loki:3100/loki/api/v1/push"
-    tenant_id: "pocket-pal"
-    labels:
-      attributes:
-        service.name: "service_name"
-        service.version: "service_version"
-        environment: "environment"
-      resource:
-        service.name: "service_name"
+    headers:
+      Content-Type: "application/json"
+    tls:
+      insecure: true
+    compression: gzip
 
   debug:
-    verbosity: normal
+    verbosity: detailed
 
 service:
   pipelines:
@@ -66,4 +60,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [resource, batch, attributes]
-      exporters: [debug, loki]
+      exporters: [debug, otlphttp]
