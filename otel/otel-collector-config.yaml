@@ -36,13 +36,17 @@ exporters:
     tls:
       insecure: true
 
-  # Send logs to Loki via HTTP
-  otlphttp/loki:
-    endpoint: "http://loki:3100/otlp/v1/logs"
-    tls:
-      insecure: true
-    headers:
-      "Content-Type": "application/x-protobuf"
+  # Direct Loki exporter (the original working approach)
+  loki:
+    endpoint: "http://loki:3100/loki/api/v1/push"
+    tenant_id: "pocket-pal"
+    labels:
+      attributes:
+        service.name: "service_name"
+        service.version: "service_version"
+        environment: "environment"
+      resource:
+        service.name: "service_name"
 
   debug:
     verbosity: normal
@@ -62,4 +66,4 @@ service:
     logs:
       receivers: [otlp]
       processors: [resource, batch, attributes]
-      exporters: [debug, otlphttp/loki]
+      exporters: [debug, loki]
