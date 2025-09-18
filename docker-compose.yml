@@ -40,7 +40,7 @@ services:
       - "3100:3100"
     volumes:
       - ./loki/loki-config.yml:/etc/loki/local-config.yml
-      - loki_data:/tmp/loki
+      - /var/lib/loki:/tmp/loki
     command: -config.file=/etc/loki/local-config.yml
     networks:
       - observability
@@ -148,7 +148,6 @@ services:
 
 volumes:
   grafana_data:
-  loki_data:
   prometheus_data:
 networks:
   observability:

@@ -40,7 +40,7 @@ services:
       - "3100:3100"
     volumes:
       - ./loki/loki-config.prod.yml:/etc/loki/local-config.yml
-      - loki_data:/loki
+      - /var/lib/loki:/loki
     command: -config.file=/etc/loki/local-config.yml
     user: "0"
     networks:
@@ -94,9 +94,22 @@ services:
     networks:
       - observability
 
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    command: -config.file=/etc/promtail/config.yml
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml
+      - /var/run/docker.sock:/var/run/docker.sock
+    ports:
+      - "9080:9080"
+    depends_on:
+      - loki
+    networks:
+      - observability
+
 volumes:
   grafana_data:
-  loki_data:
   prometheus_data:
 networks:
   observability:
