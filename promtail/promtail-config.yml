@@ -9,10 +9,36 @@ clients:
   - url: http://loki:3100/loki/api/v1/push
 
 scrape_configs:
-  - job_name: system
-    static_configs:
-      - targets:
-          - localhost
-        labels:
-          job: shopping-service
-          __path__: /log/shopping-service/*.log
+  # STT Service Docker logs
+  - job_name: stt-service
+    docker_sd_configs:
+      - host: unix:///var/run/docker.sock
+        refresh_interval: 5s
+        filters:
+          - name: name
+            values: ["stt-service"]
+    relabel_configs:
+      - source_labels: ['__meta_docker_container_name']
+        target_label: 'container'
+      - source_labels: ['__meta_docker_container_id']
+        target_label: 'container_id'
+      - target_label: 'job'
+        replacement: 'stt-service'
+      - target_label: 'service_name'  
+        replacement: 'stt-service'
+    pipeline_stages:
+      - json:
+          expressions:
+            level: level
+            timestamp: time
+            message: msg
+      - labels:
+          level:
+          service_name:
+      - timestamp:
+          source: timestamp
+          format: '2006-01-02T15:04:05.000000000Z'
+          fallback_formats:
+            - '2006-01-02T15:04:05Z'
+            - RFC3339Nano
+            - '2006-01-02 15:04:05'

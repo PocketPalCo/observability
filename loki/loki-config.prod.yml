@@ -27,10 +27,10 @@ storage_config:
 
 table_manager:
   retention_deletes_enabled: true
-  retention_period: 72h  # 3 days
+  retention_period: 168h  # 7 days (1 week)
 
 limits_config:
-  retention_period: 72h  # 3 days
-  max_query_time: 72h    # Limit queries to retention period
-  ingestion_rate_mb: 8   # Lower rate for local development
-  ingestion_burst_size_mb: 16  # Lower burst for local
+  retention_period: 168h  # 7 days (1 week)
+  max_query_time: 168h    # Limit queries to retention period
+  ingestion_rate_mb: 16   # Limit ingestion rate to 16MB/s
+  ingestion_burst_size_mb: 32  # Allow bursts up to 32MB

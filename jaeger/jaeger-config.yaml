@@ -1,0 +1,55 @@
+# ----------------------------
+# jaeger/jaeger-config.yaml
+# ----------------------------
+
+receivers:
+  jaeger:
+    protocols:
+      grpc:
+        endpoint: ":14250"
+      thrift_http:
+        endpoint: ":14268"
+      thrift_compact:
+        endpoint: ":6831"
+      thrift_binary:
+        endpoint: ":6832"
+  zipkin:
+    endpoint: ":9411"
+
+processors:
+  batch:
+    timeout: 1s
+
+extensions:
+  # 1) storage extension: name your backend ("trace_storage") and then its type
+  jaeger_storage:
+    backends:
+      trace_storage:
+        memory:
+          max_traces: 100000      # ≤-–– in-memory ring buffer :contentReference[oaicite:0]{index=0}
+
+  # 2) query extension: reference the same backend by name
+  jaeger_query:
+    storage:
+      traces: trace_storage
+    ui: {}                       # serve the standard UI
+
+  # 3) health-check
+  healthcheckv2:
+    use_v2: true
+    http:
+      endpoint: "0.0.0.0:13133"
+
+exporters:
+  nop: {}                       # no-op — the storage/query extensions handle it
+
+service:
+  extensions: [healthcheckv2, jaeger_storage, jaeger_query]
+  pipelines:
+    traces:
+      receivers: [jaeger, zipkin]
+      processors: [batch]
+      exporters: [nop]
+  telemetry:
+    logs:
+      level: info

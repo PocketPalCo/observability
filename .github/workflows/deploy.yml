@@ -1,0 +1,140 @@
+name: Deploy Observability Stack
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - production
+          - staging
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup SSH Agent
+      uses: webfactory/ssh-agent@v0.9.0
+      with:
+        ssh-private-key: ${{ secrets.HETZNER_SSH_PRIVATE_KEY }}
+
+    - name: Add Hetzner server to known hosts
+      run: |
+        ssh-keyscan -H ${{ secrets.HETZNER_SERVER_IP }} >> ~/.ssh/known_hosts
+
+    - name: Test SSH connection
+      run: |
+        ssh -o ConnectTimeout=10 root@${{ secrets.HETZNER_SERVER_IP }} "echo 'SSH connection successful'"
+
+    - name: Create deployment directory
+      run: |
+        ssh root@${{ secrets.HETZNER_SERVER_IP }} "mkdir -p /opt/observability"
+
+    - name: Copy observability files to server
+      run: |
+        scp -r * root@${{ secrets.HETZNER_SERVER_IP }}:/opt/observability/
+
+    - name: Deploy observability stack
+      run: |
+        ssh root@${{ secrets.HETZNER_SERVER_IP }} << 'EOF'
+          cd /opt/observability
+
+          # Stop existing containers if running
+          docker-compose -f docker-compose.prod.yml down || true
+
+          # Pull latest images
+          docker-compose -f docker-compose.prod.yml pull
+
+          # Start the observability stack
+          docker-compose -f docker-compose.prod.yml up -d
+
+          # Wait for services to be healthy
+          echo "Waiting for services to start..."
+          sleep 30
+
+          # Check service health
+          docker-compose -f docker-compose.prod.yml ps
+
+          # Test endpoints
+          echo "Testing Grafana..."
+          curl -f http://localhost:3099/api/health || echo "Grafana not ready yet"
+
+          echo "Testing Prometheus..."
+          curl -f http://localhost:9090/-/healthy || echo "Prometheus not ready yet"
+
+          echo "Testing Loki..."
+          curl -f http://localhost:3100/ready || echo "Loki not ready yet"
+
+          echo "Deployment completed!"
+        EOF
+
+    - name: Verify deployment
+      run: |
+        ssh root@${{ secrets.HETZNER_SERVER_IP }} << 'EOF'
+          cd /opt/observability
+          echo "=== Container Status ==="
+          docker-compose -f docker-compose.prod.yml ps
+
+          echo ""
+          echo "=== Container Logs (last 10 lines each) ==="
+          for container in grafana prometheus loki otel-collector jaeger node_exporter; do
+            echo "--- $container logs ---"
+            docker logs --tail 10 $container 2>&1 || echo "Container $container not found"
+            echo ""
+          done
+
+          echo "=== Disk Usage ==="
+          df -h /opt/observability
+
+          echo "=== Memory Usage ==="
+          free -h
+        EOF
+
+    - name: Create deployment summary
+      run: |
+        cat << 'EOF' >> $GITHUB_STEP_SUMMARY
+        ## 🚀 Observability Stack Deployment
+
+        **Environment**: ${{ github.event.inputs.environment || 'production' }}
+        **Server**: ${{ secrets.HETZNER_SERVER_IP }}
+        **Commit**: ${{ github.sha }}
+
+        ### 📊 Services Deployed:
+        - **Grafana**: http://${{ secrets.HETZNER_SERVER_IP }}:3099 (admin/admin)
+        - **Prometheus**: http://${{ secrets.HETZNER_SERVER_IP }}:9090
+        - **Loki**: http://${{ secrets.HETZNER_SERVER_IP }}:3100
+        - **Jaeger**: http://${{ secrets.HETZNER_SERVER_IP }}:16686
+        - **OTEL Collector**: Ports 4317 (gRPC), 4318 (HTTP)
+        - **Node Exporter**: http://${{ secrets.HETZNER_SERVER_IP }}:9101
+
+        ### 🔧 Configuration:
+        - Log retention: 7 days (production)
+        - Docker Compose: `docker-compose.prod.yml`
+        - Network: `observability` bridge network
+
+        **Deployment Status**: ✅ Complete
+        EOF
+
+  notify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+    - name: Notify deployment result
+      run: |
+        if [ "${{ needs.deploy.result }}" == "success" ]; then
+          echo "✅ Observability stack deployed successfully to ${{ secrets.HETZNER_SERVER_IP }}"
+        else
+          echo "❌ Observability stack deployment failed"
+        fi
