@@ -9,7 +9,7 @@ common:
     kvstore:
       store: inmemory
   replication_factor: 1
-  path_prefix: /tmp/loki
+  path_prefix: /opt/loki
 
 schema_config:
   configs:
@@ -23,10 +23,10 @@ schema_config:
 
 storage_config:
   filesystem:
-    directory: /tmp/loki/chunks
+    directory: /opt/loki/chunks
 
 compactor:
-  working_directory: /tmp/loki/retention
+  working_directory: /opt/loki/retention
   compaction_interval: 10m
   retention_enabled: true
   retention_delete_delay: 2h

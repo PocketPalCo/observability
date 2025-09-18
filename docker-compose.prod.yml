@@ -40,7 +40,7 @@ services:
       - "3100:3100"
     volumes:
       - ./loki/loki-config.prod.yml:/etc/loki/local-config.yml
-      - loki_data:/tmp/loki
+      - loki_data:/opt/loki
     command: -config.file=/etc/loki/local-config.yml
     networks:
       - observability
