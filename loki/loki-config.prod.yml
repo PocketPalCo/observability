@@ -25,12 +25,15 @@ storage_config:
   filesystem:
     directory: /tmp/loki/chunks
 
-table_manager:
-  retention_deletes_enabled: true
-  retention_period: 168h  # 7 days (1 week)
+compactor:
+  working_directory: /tmp/loki/retention
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+  retention_delete_worker_count: 150
 
 limits_config:
   retention_period: 168h  # 7 days (1 week)
-  max_query_time: 168h    # Limit queries to retention period
+  max_query_length: 168h  # Limit queries to retention period
   ingestion_rate_mb: 16   # Limit ingestion rate to 16MB/s
   ingestion_burst_size_mb: 32  # Allow bursts up to 32MB
