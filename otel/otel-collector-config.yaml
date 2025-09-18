@@ -10,11 +10,21 @@ processors:
   batch:
     timeout: 1s
     send_batch_size: 1024
-  
+
   resource:
     attributes:
       - key: service.namespace
         value: pocket-pal
+        action: insert
+
+  # Transform logs to Loki format
+  attributes:
+    actions:
+      - key: loki.tenant
+        value: pocket-pal
+        action: insert
+      - key: loki.attribute.labels
+        value: service.name,service.version,service.namespace
         action: insert
 
 exporters:
@@ -26,8 +36,16 @@ exporters:
     tls:
       insecure: true
 
+  # Send logs to Loki via HTTP
+  otlphttp/loki:
+    endpoint: "http://loki:3100/otlp/v1/logs"
+    tls:
+      insecure: true
+    headers:
+      "Content-Type": "application/x-protobuf"
+
   debug:
-    verbosity: detailed
+    verbosity: normal
 
 service:
   pipelines:
@@ -43,5 +61,5 @@ service:
 
     logs:
       receivers: [otlp]
-      processors: [resource, batch]
-      exporters: [debug]
+      processors: [resource, batch, attributes]
+      exporters: [debug, otlphttp/loki]
