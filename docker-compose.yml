@@ -2,8 +2,9 @@ services:
   grafana:
     image: grafana/grafana:latest
     container_name: grafana
+    restart: unless-stopped
     ports:
-      - "3099:3000"
+      - "127.0.0.1:3099:3000"
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
       - GF_USERS_ALLOW_SIGN_UP=false
@@ -18,8 +19,9 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    restart: unless-stopped
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -36,8 +38,9 @@ services:
   loki:
     image: grafana/loki:latest
     container_name: loki
+    restart: unless-stopped
     ports:
-      - "3100:3100"
+      - "3100:3100"  # Kept open for external promtail, secured by firewall
     volumes:
       - ./loki/loki-config.yml:/etc/loki/local-config.yml
       - /var/lib/loki:/tmp/loki
@@ -48,13 +51,14 @@ services:
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:latest
+    restart: unless-stopped
     command: ["--config=/etc/otel/otel-collector-config.yaml"]
     volumes:
      - ./otel/otel-collector-config.yaml:/etc/otel/otel-collector-config.yaml
     ports:
-      - "4317:4317"    # OTLP gRPC
-      - "4318:4318"    # OTLP Http
-      - "8889:8889"    # Prometheus metrics endpoint
+      - "127.0.0.1:4317:4317"    # OTLP gRPC
+      - "127.0.0.1:4318:4318"    # OTLP Http
+      - "127.0.0.1:8889:8889"    # Prometheus metrics endpoint
     depends_on:
       - loki
     networks:
@@ -69,9 +73,10 @@ services:
   node_exporter:
     image: prom/node-exporter:latest
     container_name: node_exporter
+    restart: unless-stopped
     privileged: true
     ports:
-      - "9101:9100"
+      - "127.0.0.1:9101:9100"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
@@ -92,30 +97,33 @@ services:
   jaeger:
     image: jaegertracing/jaeger:latest
     container_name: jaeger
+    restart: unless-stopped
     command: [ "--config=/etc/jaeger/jaeger-config.yaml" ]
     volumes:
       - ./jaeger/jaeger-config.yaml:/etc/jaeger/jaeger-config.yaml:ro
       - ./jaeger/ui-config.json:/etc/jaeger/ui-config.json:ro
     ports:
-      - "16686:16686"     # Query UI/API
-      - "14250:14250"     # OTLP/gRPC receiver
-      - "14268:14268"     # Jaeger Thrift-HTTP /api/traces
-      - "9411:9411"       # Zipkin receiver
-      - "6831:6831/udp"   # Thrift compact
-      - "6832:6832/udp"   # Thrift binary
-      - "13133:13133"     # Healthcheck v2
+      - "127.0.0.1:16686:16686"     # Query UI/API
+      - "127.0.0.1:14250:14250"     # OTLP/gRPC receiver
+      - "127.0.0.1:14268:14268"     # Jaeger Thrift-HTTP /api/traces
+      - "127.0.0.1:9411:9411"       # Zipkin receiver
+      - "127.0.0.1:6831:6831/udp"   # Thrift compact
+      - "127.0.0.1:6832:6832/udp"   # Thrift binary
+      - "127.0.0.1:13133:13133"     # Healthcheck v2
     networks:
       - observability
 
   promtail:
     image: grafana/promtail:latest
     container_name: promtail
+    restart: unless-stopped
     command: -config.file=/etc/promtail/config.yml
     volumes:
       - ./promtail/promtail-config.yml:/etc/promtail/config.yml
       - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
     ports:
-      - "9080:9080"
+      - "127.0.0.1:9080:9080"
     depends_on:
       - loki
     networks:
@@ -125,6 +133,7 @@ services:
   dcgm_exporter:
     image: nvidia/dcgm-exporter:latest
     container_name: dcgm_exporter
+    restart: unless-stopped
     runtime: nvidia
     privileged: true
     cap_add:
@@ -141,7 +150,7 @@ services:
             - driver: nvidia
               capabilities: [ gpu ]
     ports:
-      - "9400:9400"
+      - "127.0.0.1:9400:9400"
     networks:
       - observability
 
